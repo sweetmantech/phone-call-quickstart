@@ -7,7 +7,7 @@ async function makeOutboundCall() {
   try {
     const call = await client.calls.create({
       url: "http://demo.twilio.com/docs/voice.xml", // Replace with your TwiML URL
-      to: "+1234567890", // Replace with the recipient's phone number
+      to: process.env.TWILIO_TO_PHONE_NUMBER,
       from: process.env.TWILIO_PHONE_NUMBER,
     });
 
