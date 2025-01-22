@@ -18,6 +18,9 @@ importers:
       '@types/node':
         specifier: ^20.11.16
         version: 20.17.14
+      '@types/twilio':
+        specifier: ^3.19.2
+        version: 3.19.3
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@types/node@20.17.14)(typescript@5.7.3)
@@ -64,6 +67,10 @@ packages:
 
   '@types/strip-json-comments@0.0.30':
     resolution: {integrity: sha512-7NQmHra/JILCd1QqpSzl8+mJRc8ZHz3uDm8YV1Ks9IhK0epEiTw8aIErbvH9PI+6XbqhyIQy3462nEsn7UVzjQ==}
+
+  '@types/twilio@3.19.3':
+    resolution: {integrity: sha512-W53Z0TDCu6clZ5CzTWHRPnpQAad+AANglx6WiQ4Mkxxw21o4BYBx5EhkfR6J4iYqY58rtWB3r8kDGJ4y1uTUGQ==}
+    deprecated: This is a stub types definition. twilio provides its own type definitions, so you do not need this installed.
 
   acorn-walk@8.3.4:
     resolution: {integrity: sha512-ueEepnujpqee2o5aIYnvHU6C0A42MNdsIDeqy5BydrkuC5R1ZuUFnm27EeFJGoEHJQgn3uleRvmTXaJgfXbt4g==}
@@ -520,6 +527,13 @@ snapshots:
   '@types/strip-bom@3.0.0': {}
 
   '@types/strip-json-comments@0.0.30': {}
+
+  '@types/twilio@3.19.3':
+    dependencies:
+      twilio: 4.23.0
+    transitivePeerDependencies:
+      - debug
+      - supports-color
 
   acorn-walk@8.3.4:
     dependencies:
