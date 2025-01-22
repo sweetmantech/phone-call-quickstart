@@ -1,6 +1,6 @@
 # Twilio Phone Call Starter
 
-A simple Node.js template for making outbound phone calls using Twilio.
+A simple TypeScript template for making outbound phone calls using Twilio.
 
 ## Setup
 
@@ -17,14 +17,20 @@ pnpm install
      - `TWILIO_ACCOUNT_SID`: Your Twilio Account SID
      - `TWILIO_AUTH_TOKEN`: Your Twilio Auth Token
      - `TWILIO_PHONE_NUMBER`: Your Twilio phone number
-
-3. Update the recipient's phone number in `index.js`
+     - `TWILIO_TO_PHONE_NUMBER`: The recipient's phone number
 
 ## Usage
 
-Run the script:
+Run in development mode with auto-reload:
 
 ```bash
+pnpm dev
+```
+
+Or build and run in production:
+
+```bash
+pnpm build
 pnpm start
 ```
 
