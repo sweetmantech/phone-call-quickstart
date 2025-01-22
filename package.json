@@ -1,0 +1,13 @@
+{
+  "name": "twilio-phone-call-starter",
+  "version": "1.0.0",
+  "description": "A starter template for making outbound phone calls with Twilio",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "twilio": "^4.22.0",
+    "dotenv": "^16.4.1"
+  }
+} 
