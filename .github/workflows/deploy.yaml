@@ -59,8 +59,12 @@ jobs:
             source ~/.nvm/nvm.sh
             nvm use 20
 
-            # Install pnpm globally
+            # Install and setup pnpm
             npm install -g pnpm
+            pnpm setup
+            source ~/.bashrc
+            export PNPM_HOME="/root/.local/share/pnpm"
+            export PATH="$PNPM_HOME:$PATH"
 
             # Install dependencies and global packages
             pnpm install -g ts-node typescript ts-node-dev
