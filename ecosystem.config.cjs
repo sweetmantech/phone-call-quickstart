@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: "recoup-phone-call",
-      script: "npm",
+      script: "pnpm",
       args: "dev",
       cron_restart: "0 */12 * * *",
       watch: false,
