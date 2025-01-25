@@ -1,87 +1,176 @@
-// src/app.ts
+import Fastify from "fastify";
+import WebSocket from "ws";
+import dotenv from "dotenv";
+import fastifyFormBody from "@fastify/formbody";
+import fastifyWs from "@fastify/websocket";
 
-import "dotenv/config";
-import express, { Response } from "express";
-import ExpressWs from "express-ws";
-import VoiceResponse from "twilio/lib/twiml/VoiceResponse";
-import { ElevenLabsClient } from "elevenlabs";
-import { type WebSocket } from "ws";
-import { Readable } from "stream";
+// Load environment variables from .env file
+dotenv.config();
 
-const app = ExpressWs(express()).app;
-const PORT: number = parseInt(process.env.PORT || "5000");
+const { ELEVENLABS_AGENT_ID } = process.env;
 
-const elevenlabs = new ElevenLabsClient();
-const voiceId = "21m00Tcm4TlvDq8ikWAM";
-const outputFormat = "ulaw_8000";
-const text =
-  "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.";
-
-function startApp() {
-  app.post("/call/incoming", (_, res: Response) => {
-    const twiml = new VoiceResponse();
-
-    twiml.connect().stream({
-      url: `wss://${process.env.SERVER_DOMAIN}/call/connection`,
-    });
-
-    res.writeHead(200, { "Content-Type": "text/xml" });
-    res.end(twiml.toString());
-  });
-
-  app.ws("/call/connection", (ws: WebSocket) => {
-    ws.on("message", async (data: string) => {
-      const message: {
-        event: string;
-        start?: { streamSid: string; callSid: string };
-      } = JSON.parse(data);
-
-      if (message.event === "start" && message.start) {
-        const streamSid = message.start.streamSid;
-        const response = await elevenlabs.textToSpeech.convert(voiceId, {
-          model_id: "eleven_flash_v2_5",
-          output_format: outputFormat,
-          text,
-        });
-
-        const readableStream = Readable.from(response);
-        const audioArrayBuffer = await streamToArrayBuffer(readableStream);
-
-        ws.send(
-          JSON.stringify({
-            streamSid,
-            event: "media",
-            media: {
-              payload: Buffer.from(audioArrayBuffer as any).toString("base64"),
-            },
-          })
-        );
-      }
-    });
-
-    ws.on("error", console.error);
-  });
-
-  app.listen(PORT, () => {
-    console.log(`Local: http://localhost:${PORT}`);
-    console.log(`Remote: https://${process.env.SERVER_DOMAIN}`);
-  });
+// Check for the required ElevenLabs Agent ID
+if (!ELEVENLABS_AGENT_ID) {
+  console.error("Missing ELEVENLABS_AGENT_ID in environment variables");
+  process.exit(1);
 }
 
-function streamToArrayBuffer(readableStream: Readable) {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
+// Initialize Fastify server
+const fastify = Fastify();
+fastify.register(fastifyFormBody);
+fastify.register(fastifyWs);
 
-    readableStream.on("data", (chunk) => {
-      chunks.push(chunk);
-    });
+const PORT = process.env.PORT || 8000;
 
-    readableStream.on("end", () => {
-      resolve(Buffer.concat(chunks).buffer);
-    });
+// Root route for health check
+fastify.get("/", async (_, reply) => {
+  reply.send({ message: "Server is running" });
+});
 
-    readableStream.on("error", reject);
-  });
-}
+// Route to handle incoming calls from Twilio
+fastify.all("/call/incoming", async (request, reply) => {
+  // Generate TwiML response to connect the call to a WebSocket stream
+  const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+    <Response>
+    <Connect>
+        <Stream url="wss://${request.headers.host}/media-stream" />
+    </Connect>
+    </Response>`;
 
-startApp();
+  reply.type("text/xml").send(twimlResponse);
+});
+
+// WebSocket route for handling media streams from Twilio
+fastify.register(async (fastifyInstance) => {
+  fastifyInstance.get(
+    "/media-stream",
+    { websocket: true },
+    (connection, req) => {
+      console.info("[Server] Twilio connected to media stream.");
+
+      let streamSid: string | null = null;
+
+      // Connect to ElevenLabs Conversational AI WebSocket
+      const elevenLabsWs = new WebSocket(
+        `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${ELEVENLABS_AGENT_ID}`
+      );
+
+      // Handle open event for ElevenLabs WebSocket
+      elevenLabsWs.on("open", () => {
+        console.log("[II] Connected to Conversational AI.");
+      });
+
+      // Handle messages from ElevenLabs
+      elevenLabsWs.on("message", (data) => {
+        try {
+          const message = JSON.parse(data.toString());
+          handleElevenLabsMessage(message, connection);
+        } catch (error) {
+          console.error("[II] Error parsing message:", error);
+        }
+      });
+
+      // Handle errors from ElevenLabs WebSocket
+      elevenLabsWs.on("error", (error) => {
+        console.error("[II] WebSocket error:", error);
+      });
+
+      // Handle close event for ElevenLabs WebSocket
+      elevenLabsWs.on("close", () => {
+        console.log("[II] Disconnected.");
+      });
+
+      // Function to handle messages from ElevenLabs
+      const handleElevenLabsMessage = (message: any, connection: any) => {
+        switch (message.type) {
+          case "conversation_initiation_metadata":
+            console.info("[II] Received conversation initiation metadata.");
+            break;
+          case "audio":
+            if (message.audio_event?.audio_base_64) {
+              // Send audio data to Twilio
+              const audioData = {
+                event: "media",
+                streamSid,
+                media: {
+                  payload: message.audio_event.audio_base_64,
+                },
+              };
+              connection.send(JSON.stringify(audioData));
+            }
+            break;
+          case "interruption":
+            // Clear Twilio's audio queue
+            connection.send(JSON.stringify({ event: "clear", streamSid }));
+            break;
+          case "ping":
+            // Respond to ping events from ElevenLabs
+            if (message.ping_event?.event_id) {
+              const pongResponse = {
+                type: "pong",
+                event_id: message.ping_event.event_id,
+              };
+              elevenLabsWs.send(JSON.stringify(pongResponse));
+            }
+            break;
+        }
+      };
+
+      // Handle messages from Twilio
+      connection.on("message", async (message) => {
+        try {
+          const data = JSON.parse(message.toString());
+          switch (data.event) {
+            case "start":
+              // Store Stream SID when stream starts
+              streamSid = data.start.streamSid;
+              console.log(`[Twilio] Stream started with ID: ${streamSid}`);
+              break;
+            case "media":
+              // Route audio from Twilio to ElevenLabs
+              if (elevenLabsWs.readyState === WebSocket.OPEN) {
+                // data.media.payload is base64 encoded
+                const audioMessage = {
+                  user_audio_chunk: Buffer.from(
+                    data.media.payload,
+                    "base64"
+                  ).toString("base64"),
+                };
+                elevenLabsWs.send(JSON.stringify(audioMessage));
+              }
+              break;
+            case "stop":
+              // Close ElevenLabs WebSocket when Twilio stream stops
+              elevenLabsWs.close();
+              break;
+            default:
+              console.log(`[Twilio] Received unhandled event: ${data.event}`);
+          }
+        } catch (error) {
+          console.error("[Twilio] Error processing message:", error);
+        }
+      });
+
+      // Handle close event from Twilio
+      connection.on("close", () => {
+        elevenLabsWs.close();
+        console.log("[Twilio] Client disconnected");
+      });
+
+      // Handle errors from Twilio WebSocket
+      connection.on("error", (error) => {
+        console.error("[Twilio] WebSocket error:", error);
+        elevenLabsWs.close();
+      });
+    }
+  );
+});
+
+// Start the Fastify server
+fastify.listen({ port: Number(PORT) }, (err) => {
+  if (err) {
+    console.error("Error starting server:", err);
+    process.exit(1);
+  }
+  console.log(`[Server] Listening on port ${PORT}`);
+});
