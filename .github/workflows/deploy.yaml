@@ -59,8 +59,13 @@ jobs:
             source ~/.nvm/nvm.sh
             nvm use 20
 
+            # Install pnpm globally
+            npm install -g pnpm
+
             # Install dependencies and global packages
-            pnpm install -g ts-node typescript
+            pnpm install -g ts-node typescript ts-node-dev
             pnpm install
 
-            pm2 restart ecosystem.config.cjs --update-env
+            # Ensure PM2 is using the correct Node version
+            pm2 delete all || true
+            NVM_DIR="/root/.nvm" pm2 restart ecosystem.config.cjs --update-env --interpreter=/root/.nvm/versions/node/v20/bin/node
