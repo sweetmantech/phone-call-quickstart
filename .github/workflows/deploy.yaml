@@ -59,17 +59,11 @@ jobs:
             source ~/.nvm/nvm.sh
             nvm use 20
 
-            # Install and setup pnpm
+            # Install pnpm and global packages
             npm install -g pnpm
-            pnpm setup
-            source ~/.bashrc
-            export PNPM_HOME="/root/.local/share/pnpm"
-            export PATH="$PNPM_HOME:$PATH"
-
-            # Install dependencies and global packages
             pnpm install -g ts-node typescript ts-node-dev
             pnpm install
 
             # Ensure PM2 is using the correct Node version
             pm2 delete all || true
-            NVM_DIR="/root/.nvm" pm2 restart ecosystem.config.cjs --update-env --interpreter=/root/.nvm/versions/node/v20/bin/node
+            NODE_PATH=/root/.nvm/versions/node/v20.18.2/lib/node_modules pm2 restart ecosystem.config.cjs --update-env --interpreter=/root/.nvm/versions/node/v20.18.2/bin/node
