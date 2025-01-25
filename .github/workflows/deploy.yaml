@@ -59,7 +59,8 @@ jobs:
             source ~/.nvm/nvm.sh
             nvm use 20
 
-            # Install dependencies
+            # Install dependencies and global packages
+            npm install -g ts-node typescript
             npm install
 
             pm2 restart ecosystem.config.cjs --update-env
